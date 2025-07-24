@@ -26,7 +26,11 @@ class UltraSyncDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self._init = False
-
+        
+        self._areas = []
+        self._zones = []
+        self._outputs = []
+        
         # Used to track delta (for change tracking)
         self._area_delta = {}
         self._zone_delta = {}
@@ -40,6 +44,18 @@ class UltraSyncDataUpdateCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=update_interval,
         )
+        
+    @property
+    def areas(self):
+        return self._areas
+
+    @property
+    def zones(self):
+        return self._zones
+
+    @property
+    def outputs(self):
+        return self._outputs
 
     async def _async_update_data(self) -> dict:
         """Fetch data from UltraSync Hub."""
@@ -50,6 +66,10 @@ class UltraSyncDataUpdateCoordinator(DataUpdateCoordinator):
         # The hub can sometimes take a very long time to respond; wait
         async with timeout(10):
             details = await self.hass.async_add_executor_job(lambda: self.hub.details(max_age_sec=0))
+            
+            self._areas = details["areas"]
+            self._zones = details["zones"]
+            self._outputs = details["outputs"]
 
         # Update our details
         if details:
