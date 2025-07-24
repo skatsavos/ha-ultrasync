@@ -66,10 +66,6 @@ class UltraSyncDataUpdateCoordinator(DataUpdateCoordinator):
         # The hub can sometimes take a very long time to respond; wait
         async with timeout(10):
             details = await self.hass.async_add_executor_job(lambda: self.hub.details(max_age_sec=0))
-            
-            self._areas = details["areas"]
-            self._zones = details["zones"]
-            self._outputs = details["outputs"]
 
         # Update our details
         if details:
@@ -80,6 +76,10 @@ class UltraSyncDataUpdateCoordinator(DataUpdateCoordinator):
                 details["zones"],
                 details["outputs"]
             )
+            
+            self._areas = details["areas"]
+            self._zones = details["zones"]
+            self._outputs = details["outputs"]
 
             for zone in details["zones"]:
                 if self._zone_delta.get(zone["bank"]) != zone["sequence"]:
