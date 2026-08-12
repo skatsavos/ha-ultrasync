@@ -153,18 +153,3 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-class UltraSyncEntity(CoordinatorEntity):
-    """Defines a base UltraSync entity."""
-
-    def __init__(
-        self, *, entry_id: str, name: str, coordinator: UltraSyncDataUpdateCoordinator
-    ) -> None:
-        """Initialize the UltraSync entity."""
-        super().__init__(coordinator)
-        self._name = name
-        self._entry_id = entry_id
-
-    @property
-    def name(self) -> str:
-        """Return the name of the entity."""
-        return self._name

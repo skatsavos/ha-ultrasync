@@ -75,12 +75,18 @@ class UltraSyncAlarmControlPanel(
         area: dict[str, Any],
     ) -> None:
         """Initialize the alarm control panel."""
-        super().__init__(coordinator, entry)
 
         self._bank = area["bank"]
 
         self._attr_name = area["name"]
         self._attr_unique_id = f"{entry.entry_id}_alarm_{self._bank}"
+
+        super().__init__(
+            coordinator=coordinator,
+            entry_id=entry.entry_id,
+            name=area["name"],
+        )
+
 
     @property
     def _current_area(self) -> dict[str, Any] | None:
