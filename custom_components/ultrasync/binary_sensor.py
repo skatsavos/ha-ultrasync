@@ -1,7 +1,9 @@
 """Monitor UltraSync zones as binary sensors."""
 
+from __future__ import annotations
+
 import logging
-from typing import Callable, List
+from collections.abc import Callable
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -22,58 +24,72 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    async_add_entities: Callable[[List[BinarySensorEntity], bool], None],
+    async_add_entities: Callable,
 ) -> None:
     """Set up UltraSync binary sensors."""
 
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
 
-    binary_sensors = {}
+    binary_sensors: dict[str, UltraSyncZone] = {}
 
     @callback
     def _auto_manage_sensors(
-        areas: dict,
-        zones: dict,
-        outputs: dict,
-        history_data: dict,
+        areas: list,
+        zones: list,
+        outputs: list,
+        history_data: list,
     ) -> None:
-        """Create binary sensors for detected UltraSync zones."""
+        """Create and manage binary sensors for detected UltraSync zones."""
 
-        new_entities = []
-        detected = set()
+        new_entities: list[UltraSyncZone] = []
+        detected: set[str] = set()
+
+        entry_name = entry.data.get(
+            CONF_NAME,
+            entry.data.get("name", "UltraSync"),
+        )
 
         for meta in zones:
-            bank_no = meta["bank"]
+            bank_no = meta.get("bank")
+
+            if bank_no is None:
+                _LOGGER.warning(
+                    "Ignoring UltraSync zone without a bank number: %s",
+                    meta,
+                )
+                continue
+
             zone_number = bank_no + 1
             zone_id = f"zone{zone_number:02d}"
 
             detected.add(zone_id)
 
             if zone_id not in binary_sensors:
-                # Get the configured device class for this zone.
-                # Default to "door" if no setting exists yet.
                 device_class = entry.options.get(
                     f"zone_device_class_{zone_number}",
                     "door",
                 )
 
-                binary_sensors[zone_id] = UltraSyncZone(
+                zone_name = meta.get(
+                    "name",
+                    f"Zone {zone_number}",
+                )
+
+                entity = UltraSyncZone(
                     coordinator=coordinator,
-                    entry_id=entry.entry_id,
-                    entry_name=entry.data[CONF_NAME],
+                    entry=entry,
+                    entry_name=entry_name,
                     zone_id=zone_id,
-                    zone_name=meta.get(
-                        "name",
-                        f"Zone {zone_number}",
-                    ),
+                    zone_name=zone_name,
                     device_class=device_class,
                 )
 
-                new_entities.append(binary_sensors[zone_id])
+                binary_sensors[zone_id] = entity
+                new_entities.append(entity)
 
                 _LOGGER.debug(
                     "Detected %s.%s with device class %s",
-                    entry.data[CONF_NAME],
+                    entry_name,
                     zone_id,
                     device_class,
                 )
@@ -83,11 +99,16 @@ async def async_setup_entry(
         if new_entities:
             async_add_entities(new_entities)
 
-        # Remove zones which are no longer reported by the panel.
-        for zone_id in set(binary_sensors) - detected:
-            entity = binary_sensors.pop(zone_id)
-            entry.async_create_task(hass, entity.async_remove())
+        # Remove zones that are no longer reported by the panel.
+        removed_zone_ids = set(binary_sensors) - detected
 
+        for zone_id in removed_zone_ids:
+            entity = binary_sensors.pop(zone_id)
+
+            entry.async_create_task(
+                hass,
+                entity.async_remove(),
+            )
 
     hass.data[DOMAIN][entry.entry_id][
         "binary_sensor_update_listener"
@@ -106,40 +127,38 @@ class UltraSyncZone(UltraSyncEntity, BinarySensorEntity):
     def __init__(
         self,
         coordinator,
-        entry_id,
-        entry_name,
-        zone_id,
-        zone_name,
-        device_class,
-    ):
+        entry: ConfigEntry,
+        entry_name: str,
+        zone_id: str,
+        zone_name: str,
+        device_class: str,
+    ) -> None:
         """Initialize an UltraSync zone."""
 
         super().__init__(
             coordinator=coordinator,
-            entry_id=entry_id,
-            name=f"{entry_name} {zone_name}",
+            entry=entry,
         )
 
         self._zone_id = zone_id
-        self._unique_id = f"{entry_id}_{zone_id}"
-        self._attributes = {}
+        self._unique_id = f"{entry.entry_id}_{zone_id}"
+        self._attributes: dict = {}
 
+        self._attr_name = f"{entry_name} {zone_name}"
         self._attr_device_class = device_class
 
     @property
-    def unique_id(self):
+    def unique_id(self) -> str:
         """Return the unique ID."""
-
         return self._unique_id
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict:
         """Return additional zone information."""
-
         return self._attributes
 
     @property
-    def is_on(self):
+    def is_on(self) -> bool | None:
         """Return True when the zone is not Ready."""
 
         value = self.coordinator.data.get(
@@ -151,7 +170,6 @@ class UltraSyncZone(UltraSyncEntity, BinarySensorEntity):
 
         return value != "Ready"
 
-    def set_metadata(self, metadata):
+    def set_metadata(self, metadata: dict) -> None:
         """Update zone metadata."""
-
         self._attributes.update(metadata)
