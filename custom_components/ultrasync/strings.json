@@ -27,7 +27,11 @@
     "step": {
       "init": {
         "title": "UltraSync Options",
+<<<<<<< Updated upstream
         "description": "Update your UltraSync settings.",
+=======
+        "description": "Configure the update frequency and device class for each security zone.",
+>>>>>>> Stashed changes
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
           "username": "[%key:common::config_flow::data::username%]",
